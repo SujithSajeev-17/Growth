@@ -1,0 +1,368 @@
+#Growth 
+#Attribute_Based_Encryption
+#Attribute_based_privacy_preserving_data_sharing_for_dynamic_groups_in_cloud_computing
+
+#SOURCE_CODE
+#Main_code_only
+
+import base64
+import datetime
+import hashlib
+from hashlib import sha256
+from struct import pack
+from itertools import count, chain
+from ecdsa.ellipticcurve import Point
+import urllib
+from ecdsa.util import string_to_number, number_to_string, randrange
+from ecdsa.curves import SECP256k1
+from django.core.files.storage import FileSystemStorage
+from django.db.models import Exists, OuterRef
+from django.http import HttpResponse, request
+from django.shortcuts import render, redirect
+import random
+
+
+
+def download_file_staff(request,fid):
+    res=file_tb.objects.get(id=fid)
+    groupid=res.groupmember_id.group_id_id
+
+    groupmember_tbobj= groupmember_tb.objects.get(group_id_id=groupid,staff_id__login_id=request.session['lid'])
+
+
+
+    gmb= groupmember_tbobj
+
+    print(gmb.verification_key,"lk")
+
+    print(gmb.signin_key,"kks")
+
+
+    import base64
+
+    import pyAesCrypt
+
+    pyAesCrypt.decryptFile("C:\\Users\\User\\PycharmProjects\\attribute_based_encryption\\media\\" + res.file+".aes",
+                           "C:\\Users\\User\\PycharmProjects\\attribute_based_encryption\\media\\aa" +res.file ,
+                           passw="4455555555555555555555555555555")
+
+    with open("C:\\Users\\User\\PycharmProjects\\attribute_based_encryption\\media\\"+res.file+".aes", "rb") as image_file:
+        a=image_file.read()
+
+        from ecdsa import SigningKey, NIST192p
+
+        base64_string = base64.b64decode(gmb.signin_key.encode("ascii"))
+
+        sk2 = SigningKey.from_string(base64_string, curve=NIST192p)
+
+        m = sk2.verifying_key
+
+        import boto3
+
+        # Creating Session With Boto3.
+        session = boto3.Session(aws_access_key_id="AKIAT3Y2D6A25LHJXEGF",
+                                aws_secret_access_key="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")
+
+        s3 = session.resource('s3')
+
+        s3 = boto3.client('s3',aws_access_key_id="AKIAT3Y2D6A25LHJXEGF",
+                                aws_secret_access_key="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")
+
+        hs=user_file_hash.objects.get(file_id_id=res.id,staff_id__login_id=request.session['lid']).file_hash
+
+        firsthash=base64.b64decode(hs.encode('ascii'))
+
+        print("okkkk")
+
+        kk = m.verify(firsthash, a)
+
+        print(kk," check abcd")
+        if kk == True:
+            file_path="C:\\Users\\User\\PycharmProjects\\attribute_based_encryption\\media\\aa" + res.file
+            with open(file_path, 'rb') as fh:
+                response = HttpResponse(fh.read(), content_type="application/vnd.ms-excel")
+                response['Content-Disposition'] = 'inline; filename=' + file_path
+                return response
+
+
+            return HttpResponse('failed')
+
+
+        else:
+            pass
+
+
+            return HttpResponse('failed')
+
+
+# ----------------------------algo----------------------
+def group_members(request):
+    return render(request,'CEO/GROUP_MEMBERS.html')
+def random_scalar():
+    return randrange(SECP256k1.order)
+
+
+
+def group_members_post(request):
+    cc=request.POST.getlist("checkbox")
+    print(cc)
+    for i in cc:
+        gmob=groupmember_tb()
+        gmob.staff_id = staff_tb.objects.get(id=i)
+        gmob.group_id = group_tb.objects.get(id=request.session['gid'])
+
+
+        from ecdsa import SigningKey, NIST192p
+
+        sk = SigningKey.generate(curve=NIST192p)  # uses NIST192p
+
+        sk = sk.to_string()
+
+        print(type(sk))
+
+        import base64
+        base64_bytes = base64.b64encode(sk)
+        base64_string = base64_bytes.decode("ascii")
+
+        print(base64_string, type(base64_string))
+
+        gmob.signin_key= base64_string
+        gmob.signin_key= base64_string
+        gmob.save()
+
+    return group(request)
+
+def group_members_postold(request):
+    cc=request.POST.getlist("checkbox")
+    print(cc)
+    for i in cc:
+        gmob=groupmember_tb()
+        gmob.staff_id = staff_tb.objects.get(id=i)
+        gmob.group_id = group_tb.objects.get(id=request.session['gid'])
+        gmob.save()
+
+    mycount=groupmember_tb.objects.filter(group_id_id=request.session['gid']).count()
+    print(mycount)
+
+    secrets = [random_scalar() for i in range(mycount)]
+    print("secrt")
+    print(secrets)
+    print(len(secrets))
+
+    pubkeys = [G * s for s in secrets]
+    print("pubkeys")
+    print(pubkeys)
+    print(pubkeys[1])
+
+    rings = [pubkeys[:mycount]]
+    print(random.choice(secrets[:mycount]))
+    print("show scrt key")
+    secret_keys = [random.choice(secrets[:mycount])]
+    print(secret_keys)
+    print(len(secret_keys))
+
+    allmembers=groupmember_tb.objects.filter(group_id_id=request.session['gid'])
+    for i in range(mycount):
+        uskeobjs=user_group_key()
+        uskeobjs.staff_id=allmembers[i].staff_id
+        print(allmembers[i].staff_id)
+        uskeobjs.groupmem_id_id=allmembers[i].id
+        uskeobjs.KEY=pubkeys[i]
+        uskeobjs.SC_KEY=secrets[i]
+        uskeobjs.save()
+
+
+    return group(request)
+
+
+def upload_file_post(request):
+    file = request.FILES['fileField']
+    filename=request.POST['textfield']
+    from datetime import datetime
+    s = datetime.now().strftime("%Y%m%d%H%M%S") + file.name
+    fs = FileSystemStorage()
+    fn = fs.save(s, file)
+    path = s
+    a=None
+
+
+    import pyAesCrypt
+
+    pyAesCrypt.encryptFile("C:\\Users\\User\\PycharmProjects\\attribute_based_encryption\\media\\"+s,"C:\\Users\\User\\PycharmProjects\\attribute_based_encryption\\media\\"+s+".aes",passw="xxxxxxxxxxxxxxxxxxxxxxxxx")
+
+    with open("C:\\Users\\User\\PycharmProjects\\attribute_based_encryption\\media\\"+s+".aes", "rb") as image_file:
+
+         a=image_file.read()
+    encoded_string= base64.b64encode(a)
+    print("en st",len(encoded_string))
+    print(encoded_string)
+
+    m = hashlib.sha1()
+    m.update(encoded_string)
+
+
+
+    fob=file_tb()
+    fob.file=path
+    fob.groupmember_id_id=request.session["gmid"]
+    fob.date=datetime.now()
+    fob.file_name=s
+    fob.save()
+
+    yyy = []
+    members=groupmember_tb.objects.filter(group_id_id=request.session["gid"])
+    for i in members:
+        from ecdsa import SigningKey, NIST192p
+
+        base64_string =  base64.b64decode(i.signin_key.encode("ascii"))
+
+        sk2 = SigningKey.from_string(base64_string, curve=NIST192p)
+
+
+        m=sk2.sign(a)
+        print(m)
+
+        print(type(m))
+
+
+        user_file_hashpbj= user_file_hash()
+        user_file_hashpbj.file_id_id=fob.id
+        user_file_hashpbj.staff_id_id=i.staff_id_id
+        user_file_hashpbj.file_hash= base64.b64encode(m).decode('ascii')
+        user_file_hashpbj.save()
+
+        import boto3
+
+        #Creating Session With Boto3.
+        session = boto3.Session(aws_access_key_id="AKIAT3Y2D6A25LHJXEGF",aws_secret_access_key="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")
+        #Creating S3 Resource From the Session.
+        s3 = session.resource('s3')
+        s3.meta.client.upload_file("C:\\Users\\User\\PycharmProjects\\attribute_based_encryption\\media\\"+s+".aes", 'abesharecloud', s )
+
+    return HttpResponse('''<script>alert('FILE UPLOADED');window.location='/myapp/view_group_staff'</script>'''
+
+
+
+def upload_file_postold(request):
+    file = request.FILES['fileField']
+    filename=request.POST['textfield']
+    from datetime import datetime
+    s = datetime.now().strftime("%Y%m%d%H%M%S") + file.name
+    fs = FileSystemStorage()
+    fn = fs.save(s, file)
+    path = fs.url(s)
+
+    with open("C:\\Users\\User\\PycharmProjects\\attribute_based_encryption\\media\\"+s, "rb") as image_file:
+
+        a=image_file.read()
+    encoded_string= base64.b64encode(a)
+    print("en st",len(encoded_string))
+    print(encoded_string)
+
+    m = hashlib.sha1()
+    m.update(encoded_string)
+
+    print(m.hexdigest())
+    a_msg = m.hexdigest()
+
+    yyy = []
+    members=groupmember_tb.objects.filter(group_id_id=request.session["gid"])
+    for i in members:
+
+        sckey=i.signin_key
+        sckey=sckey.replace("(","").replace(")","")
+        yyy.append(int(sckey))
+    print(yyy)
+    pubkeys = [G * s for s in yyy]
+
+    rings = [pubkeys[:2]]
+
+    print("pupu")
+    print(pubkeys)
+    sig1, sign2 = sign(a_msg, rings, yyy)
+    print(sign2)
+
+    fob=file_tb()
+    fob.file=path
+    fob.groupmember_id_id=request.session["gmid"]
+    fob.date=datetime.now()
+    fob.file_name=filename
+    fob.save()
+
+    return HttpResponse('''<script>alert('FILEUPLOADED');window.location="/myapp/view_group_st   aff"</script>''')
+def H(m):
+    print("m")
+    print (m)
+    return sha256(m).digest()
+
+
+def string_to_scalar(s):
+    n = string_to_number(s)
+    assert 0 <= n < SECP256k1.order
+    return n
+
+def bor_H(m, r, i, j):
+    print("bor_h 4 values")
+    print(m)
+    print(r)
+    print(i)
+    print(j)
+
+
+    r = serialize_point(r) if isinstance(r, Point) else r
+    return string_to_scalar(H(m + r + pack('!ii', i, j)))
+
+def serialize_point(p): # SEC compressed format
+    return chr((p.y() & 1) + 2) + number_to_string(p.x(), SECP256k1.order)
+def sign(message, rings, secret_keys):
+
+
+    secret_keys = {G * secret : secret for secret in secret_keys}
+    print ("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+
+    print (secret_keys)
+    print ("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+
+
+
+    print (secret_keys)
+    print ("hellllo")
+
+    known_pubkeys = secret_keys.keys()
+
+    print (known_pubkeys)
+    known_keys_by_ring = [set(known_pubkeys) & set(ring) for ring in rings]
+
+
+
+    for ring in rings:
+        print ("******************************")
+        print (known_pubkeys)
+        print (ring)
+        print ("===============================")
+
+
+
+    # check we know a secret key in each ring
+    assert all(known_keys_by_ring)
+    known_key_indexes = [ring.index(known.pop()) for ring, known in zip(rings, known_keys_by_ring)]
+    M = H(message + ''.join(map(serialize_point, chain(*rings))))
+    s = [[random_scalar() for _ in ring] for ring in rings]
+    k = [random_scalar() for _ in ring]
+    e0_hash = sha256()
+    for ring, known_key_index, i in zip(rings, known_key_indexes, count()):
+        r_i_j = k[i] * G
+        for j in range(known_key_index + 1, len(ring)):
+            e_i_j = bor_H(M, r_i_j, i, j)
+            r_i_j = s[i][j] * G + e_i_j * ring[j]
+        e0_hash.update(serialize_point(r_i_j))
+    e0_hash.update(M)  # this step not in paper?
+    e0 = e0_hash.digest()
+    for ring, known_key_index, i in zip(rings, known_key_indexes, count()):
+        e_i_j = bor_H(M, e0, i, 0)
+        for j in range(0, known_key_index):
+            r_i_j = s[i][j] * G + e_i_j * ring[j]
+            e_i_j = bor_H(M, r_i_j, i, j + 1)
+        secret = secret_keys[ring[known_key_index]]
+        s[i][known_key_index] = (k[i] - e_i_j * secret) % SECP256k1.order
+    return e0, s
