@@ -1,6 +1,6 @@
-#source code for tic tac toe game
-#simple Project
-#jupyter notebook
+#Source code for tic tac toe game
+#Simple Project
+#Jupyter notebook
 
 from IPython.display import clear_output
 
