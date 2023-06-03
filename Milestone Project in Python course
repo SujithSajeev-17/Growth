@@ -1,6 +1,7 @@
 #Source code for tic tac toe game
-#Simple Project
-#Jupyter notebook
+#Simple_Project
+#Milestone_Project
+#Jupyter_notebook
 
 from IPython.display import clear_output
 
